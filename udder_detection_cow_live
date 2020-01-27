@@ -1,0 +1,107 @@
+# Author: Sukumar Katamreddy 
+
+# Project:  Cow's Udder detection Case study 2
+
+# import necessary packages
+
+import os
+import sys
+import tarfile
+import zipfile
+from collections import defaultdict
+from io import StringIO
+import six.moves.urllib as urllib
+import numpy as np
+import cv2
+from PIL import Image
+from matplotlib import pyplot as plt
+import tensorflow as tf
+
+# visualization imports
+
+from utils import label_map_util
+from utils import visualization_utils as vis_util
+
+
+sys.path.append("..")
+
+
+frame_capture = cv2.VideoCapture('video_data/2.mp4')
+
+
+
+# load the trained model
+model = 'cow_udder_500_images_graph'
+
+
+# trained inference graph
+checkpoint_path = model + '/frozen_inference_graph.pb'
+
+#defining the graph 
+
+d_graph = tf.Graph()
+with d_graph.as_default():
+  detection_definition_graph = tf.GraphDef()
+  with tf.gfile.GFile(checkpoint_path, 'rb') as file_id:
+    serialized_graph = file_id.read()
+    detection_definition_graph.ParseFromString(serialized_graph)
+    tf.import_graph_def(detection_definition_graph, name='')
+
+
+# Labels path
+labels_path = os.path.join('training', 'udder-detection.pbtxt')
+
+number_of_classes = 1
+
+
+# mapping catergories to label maps
+
+label_map = label_map_util.load_labelmap(labels_path)
+categories = label_map_util.convert_label_map_to_categories(label_map, max_number_of_classes=number_of_classes, use_display_name=True)
+category_index = label_map_util.create_category_index(categories)
+
+
+# start action/transaction
+
+with graph.as_default():
+  with tf.Session(graph=d_graph) as sess:
+    while True:
+      
+      # start reading video frames from a camera or from a video
+      ret, numpy_image = frame_capture.read()
+      
+  
+      image_np_expanded = np.expand_dims(numpy_image, axis=0)
+      image_tensor = d_graph.get_tensor_by_name('image_tensor:0')
+      
+      # define a bounding box
+      boxes = graph.get_tensor_by_name('detection_boxes:0')
+      
+      # define scores, classes and number of detections 
+      scores = d_graph.get_tensor_by_name('detection_scores:0')
+      classes = d_graph.get_tensor_by_name('detection_classes:0')
+      num_detections = d_graph.get_tensor_by_name('num_detections:0')
+      
+      # populate the boxesm scores, classes and number of detections
+      (boxes, scores, classes, num_detections) = sess.run(
+          [boxes, scores, classes, num_detections],
+          feed_dict={image_tensor: image_np_expanded})
+          
+      # Display a bounding box around the target with class name and score
+      vis_util.visualize_boxes_and_labels_on_image_array(
+          numpy_image,
+          np.squeeze(boxes),
+          np.squeeze(classes).astype(np.int32),
+          np.squeeze(scores),
+          category_index,
+          use_normalized_coordinates=True,
+          line_thickness=5)
+
+      plt.imshow(numpy_image)
+      cv2.imshow('Detecting_udders', cv2.resize(numpy_image, (800,600)))
+      
+      if cv2.waitKey(1) & 0xFF == ord('q'):
+        
+          cv2.destroyAllWindows()
+          break
+
